@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bistecone Run - Dust FX</title>
+    
+    <!-- Fontes Profissionais -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=Russo+One&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #00f2ff; /* Cyan Neon */
+            --secondary: #ff00ff; /* Pink Neon */
+            --dark: #0a0a12;
+            --glass: rgba(10, 10, 18, 0.85);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #111;
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            touch-action: none;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #000 100%);
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 1000px;
+            height: 500px;
+            border-radius: 20px;
+            box-shadow: 0 0 50px rgba(0, 242, 255, 0.1), 0 0 100px rgba(0,0,0,0.5);
+            overflow: hidden;
+            border: 1px solid #333;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* HUD do Jogo */
+        #hud-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .hud-panel {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            padding: 8px 16px;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+            color: #fff;
+            font-family: 'Russo One', sans-serif;
+            font-size: 1.2rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: opacity 0.3s;
+        }
+
+        /* Menu Principal */
+        #menu-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--glass);
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            transition: opacity 0.4s ease;
+        }
+
+        .menu-content {
+            text-align: center;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        h1.game-title {
+            font-family: 'Russo One', sans-serif;
+            font-size: 4.5rem;
+            margin: 0;
+            line-height: 1;
+            text-transform: uppercase;
+            color: #fff;
+            text-shadow: 0 0 10px var(--primary), 0 0 20px var(--primary), 4px 4px 0px var(--secondary);
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: #ccc;
+            margin-bottom: 40px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .subtitle span { color: var(--secondary); }
+
+        .btn-start {
+            background: linear-gradient(90deg, var(--primary), #00c2cb);
+            border: none;
+            padding: 18px 60px;
+            font-family: 'Russo One', sans-serif;
+            font-size: 1.5rem;
+            color: #000;
+            text-transform: uppercase;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.4);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
+            overflow: hidden;
+            letter-spacing: 1px;
+        }
+        .btn-start:hover { transform: scale(1.05) translateY(-2px); box-shadow: 0 0 40px rgba(0, 242, 255, 0.6); color: #fff; }
+
+        .controls-hint {
+            margin-top: 30px;
+            color: #888;
+            font-size: 0.9rem;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .key { border: 1px solid #444; padding: 4px 10px; border-radius: 4px; background: #222; color: #eee; font-weight: bold; font-size: 0.8rem; }
+
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .hidden { opacity: 0; pointer-events: none; }
+
+        @media (max-width: 600px) {
+            h1.game-title { font-size: 2.5rem; }
+            .btn-start { padding: 15px 40px; font-size: 1.2rem; }
+            #game-wrapper { height: 100vh; border-radius: 0; border: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-wrapper">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="hud-layer" class="hidden">
+            <div class="hud-panel" style="border-color: var(--primary)">
+                SCORE: <span id="scoreVal">00000</span>
+            </div>
+            <div class="hud-panel" style="border-color: var(--secondary)">
+                TOP: <span id="highScoreVal">00000</span>
+            </div>
+        </div>
+
+        <div id="menu-overlay">
+            <div class="menu-content">
+                <h1 class="game-title">BISTECONE<br><span style="color:transparent; -webkit-text-stroke: 2px #fff; text-shadow:none;">RUN</span></h1>
+                <div class="subtitle">A Live <span>Infinita</span></div>
+                <button class="btn-start" id="startBtn">Iniciar Live</button>
+                <div class="controls-hint"><div><span class="key">ESPAÇO</span> ou <span class="key">TOQUE</span> para Pular</div></div>
+                <div id="status-msg" style="margin-top: 20px; color: #ff4757; font-weight: bold; min-height: 24px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreVal = document.getElementById('scoreVal');
+        const highScoreVal = document.getElementById('highScoreVal');
+        const menuOverlay = document.getElementById('menu-overlay');
+        const hudLayer = document.getElementById('hud-layer');
+        const startBtn = document.getElementById('startBtn');
+        const statusMsg = document.getElementById('status-msg');
+
+        // --- ÁUDIOS ---
+        const jumpSound = new Audio('bisteconepulo.mp3'); jumpSound.volume = 0.6;
+        const impactSound = new Audio('bisteconeimpacto.mp3'); impactSound.volume = 0.8;
+        const dogSound = new Audio('tigrão.mp3'); dogSound.volume = 0.9;
+        const catSound = new Audio('tolinho.mp3'); catSound.volume = 0.9;
+
+        // --- VARIÁVEIS DO JOGO ---
+        let gameActive = false;
+        let score = 0;
+        let highScore = 0;
+        let gameSpeed = 6;
+        let roadOffset = 0;
+        let frameCount = 0;
+        let spawnTimer = 0;
+        let particles = []; // Array para poeira
+
+        function resize() {
+            canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+            canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- TEXTURA DE ASFALTO ---
+        const asphaltPattern = document.createElement('canvas');
+        asphaltPattern.width = 200; asphaltPattern.height = 200;
+        const aCtx = asphaltPattern.getContext('2d');
+        function generateAsphalt() {
+            aCtx.fillStyle = '#2d3436';
+            aCtx.fillRect(0, 0, 200, 200);
+            for(let i=0; i<6000; i++) {
+                const g = Math.random() * 50 + 40;
+                aCtx.fillStyle = `rgba(${g},${g},${g}, 0.5)`;
+                aCtx.fillRect(Math.random()*200, Math.random()*200, 2, 2);
+            }
+        }
+        generateAsphalt();
+
+        // --- SISTEMA DE POEIRA ---
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = -gameSpeed * 0.8; // Se move para esquerda
+                this.vy = -(Math.random() * 1 + 0.2); // Sobe levemente
+                this.size = Math.random() * 4 + 2;
+                this.life = 1.0;
+                this.color = `rgba(180, 180, 180, ${Math.random() * 0.5 + 0.3})`;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= 0.05;
+            }
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.life;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        // --- ENTIDADES ---
+        const bistecone = {
+            x: 100, y: 0, w: 40, h: 130, vy: 0, gravity: 0.55, jumpStrength: -14, groundY: 280, isJumping: false,
+            jump() {
+                if (!this.isJumping) {
+                    this.vy = this.jumpStrength;
+                    this.isJumping = true;
+                    jumpSound.currentTime = 0; jumpSound.play().catch(()=>{});
+                }
+            },
+            draw() {
+                ctx.save();
+                const dist = this.groundY - this.y;
+                const shadowScale = Math.max(0.2, 1 - dist / 200);
+                
+                // Sombra
+                ctx.beginPath(); ctx.ellipse(this.x + 20, this.groundY + 125, 30 * shadowScale, 6 * shadowScale, 0, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(0,0,0,${0.3 * shadowScale})`; ctx.fill();
+
+                ctx.translate(this.x, this.y);
+                const legSwing = gameActive ? Math.sin(frameCount * 0.15) * 15 : 0;
+                const skinColor = '#dcb898';
+
+                // Pernas
+                ctx.strokeStyle = '#e6e6dc'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                ctx.beginPath(); ctx.moveTo(15, 75);
+                if (this.isJumping) { ctx.lineTo(10, 100); ctx.lineTo(15, 125); } else { ctx.lineTo(15 + legSwing, 100); ctx.lineTo(15 + legSwing*1.2, 125); }
+                ctx.stroke();
+
+                ctx.beginPath(); ctx.moveTo(25, 75);
+                if (this.isJumping) { ctx.lineTo(30, 105); ctx.lineTo(25, 130); } else { ctx.lineTo(25 - legSwing, 100); ctx.lineTo(25 - legSwing*1.2, 125); }
+                ctx.stroke();
+
+                // Pés
+                ctx.fillStyle = skinColor;
+                if(this.isJumping) { ctx.fillRect(12, 125, 6, 4); ctx.fillRect(22, 130, 6, 4); } else { ctx.fillRect(12 + legSwing*1.2, 125, 8, 4); ctx.fillRect(22 - legSwing*1.2, 125, 8, 4); }
+
+                // Tronco
+                ctx.fillStyle = '#0f0f0f'; ctx.fillRect(12, 35, 16, 42);
+
+                // Braços
+                ctx.strokeStyle = skinColor; ctx.lineWidth = 3.5;
+                ctx.beginPath(); ctx.moveTo(12, 40); ctx.quadraticCurveTo(5, 60, 8 - (this.isJumping?0:legSwing*0.8), 75); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(28, 40); ctx.quadraticCurveTo(35, 60, 32 + (this.isJumping?0:legSwing*0.8), 75); ctx.stroke();
+
+                // Cabeça
+                ctx.fillStyle = skinColor; ctx.beginPath(); ctx.arc(20, 25, 9, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(20, 25, 9, Math.PI, 0); ctx.fill();
+                ctx.beginPath(); ctx.arc(20, 28, 9, 0, Math.PI); ctx.fill();
+
+                // Headphones
+                ctx.lineWidth = 2; ctx.strokeStyle = '#222'; ctx.beginPath(); ctx.arc(20, 25, 11, Math.PI, 0); ctx.stroke();
+                ctx.shadowBlur = 10; ctx.shadowColor = '#00ff00'; ctx.fillStyle = '#00ffea'; ctx.fillRect(8, 20, 3, 10);
+                ctx.shadowColor = '#ff00ff'; ctx.fillStyle = '#ff00aa'; ctx.fillRect(29, 20, 3, 10); ctx.shadowBlur = 0;
+                ctx.restore();
+            },
+            update() {
+                this.y += this.vy;
+                if (this.y < this.groundY) { this.vy += this.gravity; } 
+                else { this.y = this.groundY; this.vy = 0; this.isJumping = false; }
+            }
+        };
+
+        class Obstacle {
+            constructor() {
+                const rand = Math.random();
+                if (rand > 0.80) this.type = 'cat';
+                else if (rand > 0.55) this.type = 'dog';
+                else if (rand > 0.28) this.type = 'barrier';
+                else this.type = 'cone';
+
+                if (gameActive) {
+                    if (this.type === 'dog') { dogSound.currentTime = 0; dogSound.play().catch(()=>{}); }
+                    if (this.type === 'cat') { catSound.currentTime = 0; catSound.play().catch(()=>{}); }
+                }
+
+                if (this.type === 'dog') { this.w = 50; this.h = 55; }
+                else if (this.type === 'cat') { this.w = 40; this.h = 45; }
+                else if (this.type === 'cone') { this.w = 35; this.h = 45; }
+                else { this.w = 70; this.h = 50; }
+
+                this.x = (canvas.width / window.devicePixelRatio) + 100;
+                this.y = bistecone.groundY + 130 - this.h;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                if (this.type === 'dog') { 
+                    const base='#BCAAA4', dark='#5D4037', white='#F5F5F5';
+                    ctx.fillStyle=base; ctx.beginPath(); ctx.ellipse(25,35,15,20,0,0,Math.PI*2); ctx.fill();
+                    ctx.fillStyle=white; ctx.beginPath(); ctx.ellipse(25,30,8,12,0,0,Math.PI*2); ctx.fill();
+                    ctx.strokeStyle='rgba(62,39,35,0.4)'; ctx.lineWidth=2;
+                    ctx.beginPath();ctx.moveTo(12,30);ctx.lineTo(18,35);ctx.stroke();
+                    ctx.beginPath();ctx.moveTo(38,35);ctx.lineTo(32,40);ctx.stroke();
+                    ctx.fillStyle=base; ctx.beginPath();ctx.ellipse(10,45,8,10,0.5,0,Math.PI*2);ctx.fill();
+                    ctx.beginPath();ctx.ellipse(40,45,8,10,-0.5,0,Math.PI*2);ctx.fill();
+                    ctx.fillRect(18,40,4,15); ctx.fillRect(28,40,4,15);
+                    ctx.fillStyle=base; ctx.beginPath();ctx.arc(25,12,11,0,Math.PI*2);ctx.fill();
+                    ctx.fillStyle='#3E2723'; ctx.beginPath();ctx.ellipse(25,15,4,3,0,0,Math.PI*2);ctx.fill();
+                    ctx.fillStyle=dark; 
+                    ctx.beginPath();ctx.moveTo(15,5);ctx.quadraticCurveTo(8,15,12,20);ctx.quadraticCurveTo(16,12,18,8);ctx.fill();
+                    ctx.beginPath();ctx.moveTo(35,5);ctx.quadraticCurveTo(42,15,38,20);ctx.quadraticCurveTo(34,12,32,8);ctx.fill();
+                    ctx.fillStyle='black'; ctx.beginPath();ctx.arc(21,10,1.5,0,Math.PI*2);ctx.fill(); ctx.beginPath();ctx.arc(29,10,1.5,0,Math.PI*2);ctx.fill();
+                } 
+                else if (this.type === 'cat') { 
+                    const body='#EFEBE9', pts='#3E2723', eyes='#00B0FF';
+                    ctx.strokeStyle=pts; ctx.lineWidth=4; ctx.lineCap='round';
+                    ctx.beginPath();ctx.moveTo(30,35);ctx.quadraticCurveTo(45,35,40,20);ctx.stroke();
+                    ctx.fillStyle=body; ctx.beginPath();ctx.ellipse(20,32,12,16,0,0,Math.PI*2);ctx.fill();
+                    ctx.fillStyle=pts; ctx.fillRect(14,38,5,8); ctx.fillRect(21,38,5,8);
+                    ctx.fillStyle=body; ctx.beginPath();ctx.arc(20,12,10,0,Math.PI*2);ctx.fill();
+                    ctx.fillStyle=pts; ctx.beginPath();ctx.ellipse(20,14,7,5,0,0,Math.PI*2);ctx.fill();
+                    ctx.beginPath();ctx.moveTo(12,5);ctx.lineTo(8,-2);ctx.lineTo(18,2);ctx.fill();
+                    ctx.beginPath();ctx.moveTo(28,5);ctx.lineTo(32,-2);ctx.lineTo(22,2);ctx.fill();
+                    ctx.fillStyle=eyes; ctx.beginPath();ctx.arc(17,13,1.5,0,Math.PI*2);ctx.fill(); ctx.beginPath();ctx.arc(23,13,1.5,0,Math.PI*2);ctx.fill();
+                } 
+                else if (this.type === 'cone') {
+                    ctx.fillStyle='#e65100'; ctx.beginPath();ctx.moveTo(this.w/2,0);ctx.lineTo(this.w,this.h);ctx.lineTo(0,this.h);ctx.fill();
+                    ctx.fillStyle='white'; ctx.fillRect(this.w/4+2,this.h/2,this.w/2-4,10);
+                } 
+                else {
+                    const g=ctx.createLinearGradient(0,0,0,this.h); g.addColorStop(0,'#ccc'); g.addColorStop(1,'#777');
+                    ctx.fillStyle=g; ctx.fillRect(0,0,this.w,this.h);
+                    ctx.fillStyle='#333'; ctx.beginPath();ctx.moveTo(10,0);ctx.lineTo(30,this.h);ctx.lineTo(10,this.h);ctx.fill();
+                }
+                ctx.restore();
+            }
+            update() { this.x -= gameSpeed; }
+        }
+
+        let obstacles = [];
+        let clouds = [{x:50,y:50,s:1}, {x:400,y:80,s:1.2}, {x:800,y:40,s:0.8}];
+
+        function drawEnvironment() {
+            const w = canvas.width/window.devicePixelRatio; const h = canvas.height/window.devicePixelRatio;
+            
+            // Céu
+            const sky = ctx.createLinearGradient(0,0,0,h); 
+            sky.addColorStop(0,'#4facfe'); sky.addColorStop(1,'#00f2fe');
+            ctx.fillStyle = sky; ctx.fillRect(0,0,w,h);
+
+            // Nuvens
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            clouds.forEach(c => {
+                ctx.beginPath(); ctx.arc(c.x,c.y,30*c.s,0,Math.PI*2); ctx.arc(c.x+30*c.s,c.y-10*c.s,40*c.s,0,Math.PI*2); ctx.arc(c.x+60*c.s,c.y,30*c.s,0,Math.PI*2); ctx.fill();
+                if(gameActive) c.x -= gameSpeed*0.1; 
+                else c.x -= 0.5;
+                if(c.x < -150) c.x = w+150;
+            });
+
+            const roadY = 405;
+            const ptrn = ctx.createPattern(asphaltPattern, 'repeat');
+            ctx.save(); 
+            const offset = gameActive ? roadOffset : (Date.now() * 0.1); 
+            ctx.translate(-offset % 200, 0); 
+            ctx.fillStyle = ptrn; 
+            // CORREÇÃO DO CHÃO AZUL: Preenche até o fim do canvas
+            ctx.fillRect(0, roadY, w+200, h - roadY + 50); 
+            ctx.restore();
+
+            ctx.fillStyle = '#f1c40f'; 
+            const dash=100, gap=150;
+            // CORREÇÃO DAS LINHAS: Mesma velocidade do asfalto
+            const lineOffset = offset % (dash + gap);
+            for(let i=-1; i<(w/(dash+gap))+2; i++) { 
+                const lx = i * (dash + gap) - lineOffset;
+                ctx.fillRect(lx, roadY+45, dash, 6); 
+            }
+            
+            ctx.fillStyle = '#27ae60'; ctx.fillRect(0, roadY-10, w, 10);
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            drawEnvironment();
+
+            // Gerar Poeira se correndo
+            if (gameActive && !bistecone.isJumping) {
+                // Adiciona poeira aleatoriamente
+                if (Math.random() > 0.5) {
+                    particles.push(new Particle(bistecone.x + 15, bistecone.groundY + 125));
+                }
+            }
+
+            // Atualizar e desenhar poeira
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                particles[i].draw();
+                if (particles[i].life <= 0) particles.splice(i, 1);
+            }
+
+            bistecone.update();
+            bistecone.draw();
+
+            if (gameActive) {
+                spawnTimer--;
+                if (spawnTimer <= 0) {
+                    obstacles.push(new Obstacle());
+                    spawnTimer = 60 + Math.random() * 40;
+                }
+
+                for (let i = obstacles.length - 1; i >= 0; i--) {
+                    obstacles[i].update();
+                    obstacles[i].draw();
+
+                    const p = 12;
+                    if (bistecone.x+p < obstacles[i].x+obstacles[i].w-p && bistecone.x+bistecone.w-p > obstacles[i].x+p && 
+                        bistecone.y+p < obstacles[i].y+obstacles[i].h-p && bistecone.y+bistecone.h-p > obstacles[i].y+p) {
+                        gameOver();
+                    }
+                    if (obstacles[i].x < -100) obstacles.splice(i, 1);
+                }
+
+                roadOffset += gameSpeed;
+                score += gameSpeed / 50;
+                gameSpeed += 0.001;
+                scoreVal.innerText = Math.floor(score).toString().padStart(5, '0');
+                frameCount++;
+            }
+
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function gameOver() {
+            gameActive = false;
+            impactSound.currentTime = 0; impactSound.play().catch(()=>{});
+            
+            if (score > highScore) { highScore = Math.floor(score); highScoreVal.innerText = highScore.toString().padStart(5, '0'); }
+            
+            statusMsg.innerText = "LIVE CAIU! Tente novamente.";
+            menuOverlay.classList.remove('hidden');
+            hudLayer.classList.add('hidden');
+            startBtn.innerText = "Reiniciar Live";
+        }
+
+        function startGame() {
+            [jumpSound, impactSound, dogSound, catSound].forEach(s => { 
+                s.play().then(()=>{ s.pause(); s.currentTime=0; }).catch(()=>{}); 
+            });
+
+            score = 0; gameSpeed = 6; obstacles = []; particles = [];
+            bistecone.y = bistecone.groundY; bistecone.vy = 0; bistecone.isJumping = false;
+            spawnTimer = 30;
+            
+            gameActive = true;
+            menuOverlay.classList.add('hidden');
+            hudLayer.classList.remove('hidden');
+            statusMsg.innerText = "";
+        }
+
+        const handleInput = (e) => {
+            if (e && e.type === 'keydown' && e.code !== 'Space' && e.code !== 'ArrowUp') return;
+            if (gameActive) bistecone.jump();
+            else if (!menuOverlay.classList.contains('hidden')) startGame();
+        };
+
+        window.addEventListener('keydown', handleInput);
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleInput(); });
+        startBtn.addEventListener('click', (e) => { e.stopPropagation(); startGame(); });
+
+        gameLoop();
+    </script>
+</body>
+</html>
+
+
